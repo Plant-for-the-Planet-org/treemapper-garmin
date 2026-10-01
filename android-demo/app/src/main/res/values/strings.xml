@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">TreeMapper Watch Test</string>
+
+    <string name="sdk_starting">sdk     starting…</string>
+    <string name="sdk_fmt">sdk     %1$s</string>
+
+    <string name="no_device">device  none found</string>
+    <string name="device_fmt">device  %1$s  [%2$s]</string>
+
+    <string name="app_unknown">app     unknown</string>
+    <string name="app_fmt">app     %1$s</string>
+
+    <string name="watch_unknown">watch   no state yet</string>
+    <!-- quality label, quality number, gps on/off, band, buffered -->
+    <string name="watch_fmt">watch   %1$s (%2$d)  gps %3$s  %4$s  buf %5$d</string>
+
+    <string name="no_point">No point received yet.</string>
+    <string name="waiting_for_point">Waiting for the watch…</string>
+
+    <string name="log_title">LOG</string>
+    <string name="mode_simulator">ADB simulator (no Garmin Connect needed)</string>
+
+    <string name="action_refresh">Find watch</string>
+    <string name="action_open_app">Open watch app</string>
+    <string name="action_hello">Hello</string>
+    <string name="action_ping">Ping</string>
+    <string name="action_fix">Request GPS point</string>
+    <string name="action_store">Install from Connect IQ store</string>
+    <string name="action_copy">Copy log</string>
+    <string name="action_clear">Clear log</string>
+    <string name="copied_fmt">Copied %1$d lines</string>
+    <string name="nothing_to_copy">Nothing to copy yet</string>
+</resources>

@@ -21,14 +21,10 @@ developer_key
 *.key
 
 # ---------------------------------------------------------------------------
-# Android demo harness, excluded on request.
-#
-# NOTE: this means the demo is NOT version controlled. It exists only on
-# whichever machine has a copy, and a fresh clone will not have it. If it
-# should outlive this laptop, delete this line and let it be tracked, or move
-# it to its own repository.
+# The Android demo harness IS tracked. It is the reference implementation of
+# the phone side of PROTOCOL.md, so it lives with the watch app it talks to.
+# Its own build output and local SDK path are ignored by android-demo/.gitignore.
 # ---------------------------------------------------------------------------
-android-demo/
 
 # ---------------------------------------------------------------------------
 # Scratch output from the Claude desktop session, not project source

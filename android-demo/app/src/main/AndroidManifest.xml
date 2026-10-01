@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Android 11 and later hide other installed packages by default. The Connect
+      IQ SDK reaches the watch THROUGH Garmin Connect Mobile, so without this
+      queries block the SDK cannot see it and initialisation fails with a
+      confusing "service unavailable" rather than anything useful.
+
+      This is the single most common reason a Connect IQ Android integration
+      works in a tutorial and not in a real app.
+    -->
+    <queries>
+        <package android:name="com.garmin.android.apps.connectmobile" />
+    </queries>
+
+    <!--
+      Bluetooth itself is handled by Garmin Connect Mobile, which holds the
+      radio permissions. These are declared because some SDK paths query
+      adapter state. The app does not scan or bond on its own.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TreeMapperGarminDemo">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

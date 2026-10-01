@@ -1,0 +1,12 @@
+# Gradle and Android Studio build output
+build/
+.gradle/
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Local machine configuration. Holds the absolute path to the Android SDK,
+# which is different on every machine and must not be shared.
+local.properties
