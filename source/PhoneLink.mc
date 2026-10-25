@@ -16,25 +16,31 @@ import Toybox.System;
 //!   3. A view of whether anyone is listening, which is not the same thing as
 //!      whether a phone is paired.
 //!
-//! PROTOCOL VERSION 1. Keep this in step with the phone app.
+//! PROTOCOL VERSION 2. Keep this in step with the phone app.
+//!
+//! Version 2 made the link a stream. The watch posts its position on a fixed
+//! interval instead of answering one request at a time, so the request and
+//! acknowledgement messages of version 1 are gone: `fix` and `err` no longer
+//! exist, and `pt` no longer carries `r` or `src`. See PROTOCOL.md.
 //!
 //! Phone to watch
 //!   {"c":"hello"}            identify, ask for current state
-//!   {"c":"fix", "r":<n>}     send one point now, tagged with request id n
 //!   {"c":"ping"}             keepalive, answered with a state message
+//!   {"c":"rate", "ms":<n>}   change the stream interval
 //!
 //! Watch to phone
-//!   {"t":"ready", "v":1, "q":<0-4>, "gps":<0|1>, "buf":0, "mb":<0|1>}
-//!   {"t":"pt",    "r":<n or null>, "n":<seq>, "src":"phone"|"watch",
-//!                 "lat":<Double>, "lon":<Double>, "alt":<Float or null>,
-//!                 "q":<0-4>, "ts":<epoch s>, "spd":<Float or null>}
-//!   {"t":"err",   "r":<n or null>, "code":"no_position"}
+//!   {"t":"ready", "v":2, "sid":<n>, "q":<0-4>, "gps":<0|1>, "mb":<0|1>,
+//!                 "st":"live"|"paused", "ms":<n>, "n":<seq>, "drop":<n>}
+//!   {"t":"pt",    "sid":<n>, "n":<seq>, "lat":<Double>, "lon":<Double>,
+//!                 "alt":<Float, absent if none>, "q":<0-4>, "ts":<epoch s>,
+//!                 "spd":<Float, absent if none>}
 //!
 //! Every point carries `q`, the raw Position.Quality value, and nothing is
-//! filtered on the watch. The phone decides what is good enough.
+//! filtered on the watch. The phone decides what is good enough, and with a
+//! point arriving every second it has plenty to choose from.
 //! Protocol version. Module scope, not a class constant: Monkey C does not
 //! expose a class const as ClassName.CONST without an instance.
-const PROTOCOL_VERSION = 1;
+const PROTOCOL_VERSION = 2;
 
 class PhoneLink {
 
@@ -111,8 +117,10 @@ class PhoneLink {
         return _busy;
     }
 
-    //! Post one parcel. Returns false when the link is busy or unavailable,
-    //! in which case the caller keeps the point in the outbox and retries.
+    //! Post one parcel. Returns false when the link is busy or unavailable.
+    //!
+    //! There is no outbox behind this. A stream point that cannot go now is
+    //! dropped and counted, because the next tick already has a better one.
     function send(payload as Dictionary) as Boolean {
         if (_busy) { return false; }
 

@@ -19,10 +19,16 @@ fix. A cold multi-band fix takes tens of seconds, so the app starts the receiver
 on launch and keeps it warm for as long as it is open. Open it at the plot,
 leave it running, and every request answers in milliseconds.
 
-**The watch stores nothing.** One fix at a time: acquire, send it to TreeMapper
-or start over. There is no outbox, no tree count, no session record. A fix lives
-in memory only until the phone acknowledges it. To record another tree, the flow
-runs again from the top.
+**It streams, and nobody has to touch it.** Once TreeMapper has said hello, the
+watch posts its position every second until it is paused or closed. The person
+opens it at the plot, sets it down, and works from the phone. There is no
+per-tree press on the wrist.
+
+**The watch stores nothing.** No outbox, no tree count, no session record. A
+point is built from the receiver, handed to the radio and forgotten. One that
+does not make it is dropped and counted, never retried, because by the time a
+retry went out there would already be a fresher point waiting. The phone owns
+the record; the watch is a sensor.
 
 ---
 
@@ -30,26 +36,19 @@ runs again from the top.
 
 | | Screen | Purpose |
 |---|---|---|
-| 1 | **Home** | A short splash. The receiver already started in `onStart`, so this holds for 1.5 s then advances on its own. START skips it. |
+| 1 | **Home** | A short splash. The receiver and the stream already started in `onStart`, so this holds for 1.5 s then advances on its own. START skips it. |
 | 2 | **Acquiring** | Sweeping arc while the receiver converges, with an elapsed counter so slow is distinguishable from broken. Advances on a real fix, or after 90 seconds with any position. |
-| 3 | **Capture** | The fix screen. Quality ring, the quality word, START to send, BACK to start over. |
-| 4 | **Sending** | The fix is genuinely in flight, and the screen says whether the phone or the watch button asked for it. |
-| 5 | **Sent** | It reached TreeMapper. Returns to acquiring for the next tree after two seconds. |
-| 6 | **Not sent** | The send did not reach the phone. The fix is still in hand: START tries the same one again, BACK starts over. |
-| 7 | **Waiting** | Capture screen with no position yet: ring breathes, action hint goes dead, warning strip appears. |
-| 8 | **Rejected** | The only refusal the watch makes, when the receiver has no position at all. |
+| 3 | **Stream, live** | The session screen. Quality ring, the quality word, the interval, a climbing count of points sent, and a status line that is always present. START pauses. |
+| 4 | **Stream, paused** | Ring goes grey, the count stops. Says the receiver is still warm, so nobody feels they have to leave it running. START resumes. |
+| 5 | **Stream, no phone** | Same screen, status line says what is wrong: no phone in range, or TreeMapper not open. The stream sends nothing until the phone speaks first. |
+| 6 | **End session?** | A native confirmation on BACK, because the watch sits unattended and one stray press should not quietly end a session. |
 
 Plus a native `Menu2` for the quality warning threshold, and a small About page.
 
-Static previews are in [`previews/`](previews/). Regenerate with:
-
-```bash
-python3 tools/preview.py
-```
-
-That script mirrors the drawing maths from `source/ui/UiKit.mc` in Python. It is
-a review aid so the design can be looked at without launching the simulator; it
-is not part of the app.
+Static previews are in [`previews/`](previews/), but **they show the old
+one-shot capture flow and have not been regenerated for the stream screens**.
+`tools/preview.py` mirrors the drawing maths from `source/ui/UiKit.mc` in Python
+as a review aid; it is not part of the app, and it needs updating to match.
 
 ---
 
@@ -78,16 +77,13 @@ two pixel weights on black, `#007A49` drops below comfortable contrast outdoors.
 If strict brand fidelity matters more than sunlight legibility, set
 `GREEN_LIGHT = GREEN` in `Theme.mc` and nothing else changes.
 
-**The phone link is an exception report, not a status badge.** There is no
-permanent "phone connected" pill. When the link is healthy, which is almost
-always, the screen says nothing about it, because a badge that is true on every
-screen stops being read. The strip appears only when the link drops, and the
-per-fix confirmation already proves delivery: a fix that reached the phone says
-SENT, a fix that did not says NOT SENT and stays in hand. That distinction is
-the thing the user actually needs.
-
-**Sending is shown, not assumed.** Press, brief spinner, then a result. The
-watch does not claim a point was delivered before it was.
+**The status line is always shown, and that is a deliberate reversal.** The old
+capture screen only warned when something broke, on the argument that a badge
+which is true on every screen stops being read. That argument holds for a screen
+somebody is looking at while they press a button. It is exactly wrong for a
+watch left on a stump for an hour: a link that quietly died looks identical to
+one that is working. So the stream screen states its condition either way, and
+when delivery goes quiet it says how long it has been quiet.
 
 **Fades are colour blends, not alpha.** `Theme.blend()` mixes toward the
 background. Alpha only arrived in API 4.0.0, and this app should run on older
@@ -95,18 +91,23 @@ products too.
 
 **No haptics.** The watch confirms visually only. Vibration was removed on request; if it comes back, the place for it is `SessionState`, one call beside each send outcome.
 
-**The render timer drops to 1 Hz when nothing is moving.** `CaptureView` runs at
-40 ms only during an animation. On a real device with the GNSS receiver already
-running, this is the difference between a working day and an afternoon.
+**The stream does not run off the view's timer.** `SessionState` owns its own
+`Timer`, so the cadence survives a view change, the settings menu being open and
+the screen going dark. Views only draw.
 
-**Back does not silently exit.** From the capture screen, back throws the fix
-away and returns to acquiring. One more back from there leaves the app, so the
-fix in hand is never one stray press away from being lost.
+**The render timer drops to 1 Hz when nothing is animating.** `StreamView` runs
+at 50 ms only during the entry and pause transitions. With the receiver and the
+radio both working all day, frames are the one cost here that can simply be
+refused.
 
-**The confirmation continues on its own.** Mapping sixty trees should not cost
-sixty extra decisions, so the sent screen returns to acquiring by itself after
-two seconds, with a draining arc showing the wait. Any press skips it. The
-receiver never stopped, so the next fix is normally instant.
+**Pausing leaves the receiver on.** Switching GNSS off would save the larger
+share of the battery, but it would cost a cold reacquisition of tens of seconds
+on resume, and the fix being already there is the whole point of the app. The
+paused screen says "receiver still warm" so nobody avoids pausing to protect it.
+
+**Back asks before it ends the session.** The watch is meant to sit unattended.
+One stray press should not stop a stream nobody is watching, because the user
+would not find out until they looked at the phone.
 
 ---
 
@@ -117,7 +118,7 @@ manifest.xml            products, permissions, entry point
 monkey.jungle           build configuration
 source/
   TreeMapperApp.mc      AppBase, entry point
-  SessionState.mc       the brain: receiver, phone link, the one fix in hand
+  SessionState.mc       the brain: receiver, phone link, stream timer, counters
   GpsService.mc         Toybox.Position
   PhoneLink.mc          Toybox.Communications
   ui/
@@ -128,8 +129,7 @@ source/
   views/
     HomeView.mc
     AcquiringView.mc
-    CaptureView.mc      the fix screen: send, or start over
-    SentView.mc         confirmation, then back to acquiring
+    StreamView.mc       the session screen: live, paused, and what it is doing
     SessionMenu.mc      native Menu2
     AboutView.mc
 resources/
@@ -174,35 +174,39 @@ device with the exact size that product wants and the warning goes away.
 ## How the pieces fit
 
 ```
-TreeMapperApp        starts and stops the receiver with the app
-  SessionState       the brain: owns the two below, the only thing views touch,
-                     and holds the single fix in flight
+TreeMapperApp        starts and stops the receiver and the stream with the app
+  SessionState       the brain: owns the two below plus the stream timer,
+                     and is the only thing views touch
     GpsService       Toybox.Position. Picks the best supported GNSS config,
                      keeps the receiver warm, hands out snapshots
     PhoneLink        Toybox.Communications. One parcel in flight at a time,
-                     explicit acknowledgement, link state
+                     link state
 ```
 
 Three rules run through it:
 
-**A fix is not sent until the phone says so.** The watch holds it until the
-transport acknowledges it, then lets go entirely.
+**One parcel per tick, and never two.** A tick that spends its slot answering
+the phone does not also try to post a point. The BLE link returns
+`BLE_QUEUE_FULL` if you push several at once.
 
-**Nothing is stored.** A fix that does not reach the phone is not kept. The user
-is told plainly and chooses: retry the same fix, or start over. The phone owns
-the record; the watch is a sensor. Closing the app loses whatever was in hand.
+**Nothing is stored and nothing is retried.** A point that cannot go now is
+dropped and counted. `drop` counts only losses while the phone was in range, so
+the number keeps meaning one thing: this interval is too fast for this link.
 
 **The watch never filters on quality.** Every point travels with its
-`Position.Quality` value and the phone decides what to keep. The watch refuses
-only when there is no position at all.
+`Position.Quality` value and the phone decides what to keep.
 
 ## Not built yet
 
 - No `Background` permission and no background service. Everything happens while
   the app is open, which is forced by the Position restriction above.
-- No activity recording or FIT output.
-- No retry on a timer. A failed send waits for the user, so a fix they have
-  moved past cannot arrive later on its own.
+- No activity recording or FIT output. A FIT track would survive a dropped link
+  and could be pulled later through Garmin Connect, but it needs the `Fit`
+  permission, which moves the app into the device's Activities list.
+- No retry of any kind. See the rules above.
+- No measured battery figure for streaming. This is the open question that
+  matters most; see `TESTING.md`.
+- `tools/preview.py` and `previews/` still show the old capture flow.
 
 ---
 
@@ -212,8 +216,9 @@ only when there is no position at all.
   should be settled before any device specific tuning.
 - **Brand green.** `Theme.GREEN` is `#007A49`. `Theme.GREEN_LIGHT` is a lifted
   variant used only for small text; see the design notes above.
-- **Wording.** "TREES" as the count label assumes one point per tree. If a tree
-  can carry several points, or plots are the unit, the label changes.
+- **Does 1 Hz hold, and what does it cost?** Both have to be measured on real
+  hardware before the default interval is settled. The watch takes a `rate`
+  command precisely so the answer can change without a new build.
 
 
 ---

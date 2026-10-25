@@ -124,7 +124,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:backgroundTint="#007A49"
-        android:text="@string/action_fix"
+        android:text="@string/action_rate_default"
         android:textColor="#FFFFFF" />
 
     <Button

@@ -11,11 +11,10 @@
     <string name="app_fmt">app     %1$s</string>
 
     <string name="watch_unknown">watch   no state yet</string>
-    <!-- quality label, quality number, gps on/off, band, buffered -->
-    <string name="watch_fmt">watch   %1$s (%2$d)  gps %3$s  %4$s  buf %5$d</string>
+    <!-- quality label, quality number, gps on/off, band, state, interval s, seq, dropped -->
+    <string name="watch_fmt">watch   %1$s (%2$d)  gps %3$s  %4$s\n        %5$s  every %6$.1f s  n %7$d  drop %8$d</string>
 
-    <string name="no_point">No point received yet.</string>
-    <string name="waiting_for_point">Waiting for the watch…</string>
+    <string name="no_point">No point received yet. Press Hello to start the stream.</string>
 
     <string name="log_title">LOG</string>
     <string name="mode_simulator">ADB simulator (no Garmin Connect needed)</string>
@@ -24,7 +23,9 @@
     <string name="action_open_app">Open watch app</string>
     <string name="action_hello">Hello</string>
     <string name="action_ping">Ping</string>
-    <string name="action_fix">Request GPS point</string>
+    <!-- The watch streams on its own; this only retunes how fast. -->
+    <string name="action_rate_default">Ask for 2.0 s interval</string>
+    <string name="action_rate_fmt">Ask for %1$.1f s interval</string>
     <string name="action_store">Install from Connect IQ store</string>
     <string name="action_copy">Copy log</string>
     <string name="action_clear">Clear log</string>

@@ -11,9 +11,10 @@ import Toybox.WatchUi;
 //! seconds under canopy, and the person needs to see the difference between
 //! slow and broken. The elapsed counter is there for exactly that.
 //!
-//! It is re-entered after every send, but the receiver is never switched off
-//! between trees, so from the second tree onward it is normally a flash: the
-//! fix is already converged and the screen passes straight through to capture.
+//! It is shown once, on the way into the streaming session. The stream timer
+//! is already running behind it, and points start leaving the moment there is
+//! a position and the phone has made contact, so this screen is feedback
+//! during the cold wait rather than a gate in front of it.
 //!
 //! It advances as soon as the receiver reports a real 3D-capable fix, or after
 //! a long wait with any position at all, so nobody is trapped here.
@@ -68,13 +69,6 @@ class AcquiringView extends WatchUi.View {
 
         session.tick();
 
-        // The phone may ask for a fix before the person has even looked at
-        // the watch. Get out of the way and let the capture screen show it.
-        if (session.isRemoteActive()) {
-            toCapture();
-            return;
-        }
-
         var gps = session.gps();
         var settled = session.quality >= ADVANCE_QUALITY
             or (gps.hasPosition() and gps.warmupSeconds() * 1000 > PATIENCE_MS);
@@ -86,16 +80,16 @@ class AcquiringView extends WatchUi.View {
 
         var locked = _lockedAtMs;
         if (locked != null and (System.getTimer() - locked) > 1100) {
-            toCapture();
+            toStream();
             return;
         }
 
         WatchUi.requestUpdate();
     }
 
-    private function toCapture() as Void {
-        var capture = new CaptureView();
-        WatchUi.switchToView(capture, new CaptureDelegate(capture),
+    private function toStream() as Void {
+        var stream = new StreamView();
+        WatchUi.switchToView(stream, new StreamDelegate(stream),
                              WatchUi.SLIDE_IMMEDIATE);
     }
 
@@ -170,17 +164,18 @@ class AcquiringDelegate extends WatchUi.BehaviorDelegate {
         BehaviorDelegate.initialize();
     }
 
-    //! Skip ahead. The capture screen refuses to send only when there is no
-    //! position at all, so an impatient user cannot break anything here.
+    //! Skip ahead. The stream screen is honest about having no fix yet, and
+    //! the stream itself simply sends nothing until there is one, so an
+    //! impatient user cannot break anything here.
     function onSelect() as Boolean {
-        var capture = new CaptureView();
-        WatchUi.switchToView(capture, new CaptureDelegate(capture),
+        var stream = new StreamView();
+        WatchUi.switchToView(stream, new StreamDelegate(stream),
                              WatchUi.SLIDE_IMMEDIATE);
         return true;
     }
 
-    //! This is the first screen of the flow, so back leaves the app. Nothing
-    //! is in hand here, so there is nothing to lose by doing so.
+    //! The session has not really begun here, so back leaves the app without
+    //! asking. The stream screen is where that question gets asked.
     function onBack() as Boolean {
         WatchUi.popView(WatchUi.SLIDE_DOWN);
         return true;

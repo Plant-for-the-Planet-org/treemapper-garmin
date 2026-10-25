@@ -1,9 +1,14 @@
 package org.plantfortheplanet.treemapper.garmindemo
 
 /**
- * The TreeMapper watch protocol, version 1.
+ * The TreeMapper watch protocol, version 2.
  *
  * This mirrors PROTOCOL.md in the watch project. Keep the two in step.
+ *
+ * Version 2 made the link a stream. The watch posts a point every interval
+ * instead of answering requests, so `fix` and `err` are gone and `rate` is
+ * new. Points now arrive unprompted and continuously: the job of this harness
+ * changed from "did one round trip work" to "is the stream holding up".
  *
  * Message shape on the wire
  * -------------------------
@@ -19,7 +24,7 @@ object Protocol {
     /** Must match `id` in the watch project's manifest.xml. */
     const val WATCH_APP_ID = "a7f3c81e6b2d4f9ea05c73819d4e6b21"
 
-    const val VERSION = 1
+    const val VERSION = 2
 
     // ---- outbound -------------------------------------------------------
 
@@ -27,8 +32,9 @@ object Protocol {
 
     fun ping(): List<Any> = wrap(mapOf("c" to "ping"))
 
-    fun requestFix(requestId: Int): List<Any> =
-        wrap(mapOf("c" to "fix", "r" to requestId))
+    /** Change the stream interval. The watch clamps to 500..60000 ms. */
+    fun setRate(intervalMs: Int): List<Any> =
+        wrap(mapOf("c" to "rate", "ms" to intervalMs))
 
     private fun wrap(payload: Map<String, Any?>): List<Any> = listOf(payload)
 
@@ -59,16 +65,21 @@ object Protocol {
     sealed class Inbound {
         data class Ready(
             val version: Int,
+            val sessionId: Long,
             val quality: Int,
             val gpsRunning: Boolean,
             val multiBand: Boolean,
-            val buffered: Int
+            /** "live" or "paused". Only the watch can change it. */
+            val state: String,
+            val intervalMs: Int,
+            val seq: Int,
+            /** Points lost while the link was up. See PROTOCOL.md. */
+            val dropped: Int
         ) : Inbound()
 
         data class Point(
+            val sessionId: Long,
             val seq: Int,
-            val requestId: Int?,
-            val source: String,
             val latitude: Double,
             val longitude: Double,
             val altitude: Double?,
@@ -79,8 +90,6 @@ object Protocol {
             val latitudeType: String
         ) : Inbound()
 
-        data class Error(val requestId: Int?, val code: String) : Inbound()
-
         data class Unknown(val raw: Map<String, Any?>) : Inbound()
     }
 
@@ -88,18 +97,21 @@ object Protocol {
         return when (payload["t"] as? String) {
             "ready" -> Inbound.Ready(
                 version = intOf(payload["v"]) ?: 0,
+                sessionId = longOf(payload["sid"]) ?: 0L,
                 quality = intOf(payload["q"]) ?: 0,
                 gpsRunning = (intOf(payload["gps"]) ?: 0) == 1,
                 multiBand = (intOf(payload["mb"]) ?: 0) == 1,
-                buffered = intOf(payload["buf"]) ?: 0
+                state = payload["st"] as? String ?: "?",
+                intervalMs = intOf(payload["ms"]) ?: 0,
+                seq = intOf(payload["n"]) ?: 0,
+                dropped = intOf(payload["drop"]) ?: 0
             )
 
             "pt" -> {
                 val lat = payload["lat"]
                 Inbound.Point(
+                    sessionId = longOf(payload["sid"]) ?: 0L,
                     seq = intOf(payload["n"]) ?: 0,
-                    requestId = intOf(payload["r"]),
-                    source = payload["src"] as? String ?: "?",
                     latitude = doubleOf(lat) ?: 0.0,
                     longitude = doubleOf(payload["lon"]) ?: 0.0,
                     altitude = doubleOf(payload["alt"]),
@@ -109,11 +121,6 @@ object Protocol {
                     latitudeType = lat?.javaClass?.simpleName ?: "null"
                 )
             }
-
-            "err" -> Inbound.Error(
-                requestId = intOf(payload["r"]),
-                code = payload["code"] as? String ?: "unknown"
-            )
 
             else -> Inbound.Unknown(payload)
         }

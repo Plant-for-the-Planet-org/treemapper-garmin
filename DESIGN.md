@@ -37,6 +37,58 @@
 
 ---
 
+> ### Amendment, 25 October 2026: the link became a stream
+>
+> The second reversal, and the larger one. Where the amendment above changed
+> what the watch keeps, this changes what the watch is for.
+>
+> **The watch no longer waits to be asked.** From the moment TreeMapper has
+> said hello, it posts its position on a fixed interval, one second by default,
+> until it is paused from the wrist or the app is closed. There is no per-tree
+> press on the watch and no request from the phone. The person opens the app at
+> the plot, sets the watch down, and works entirely from TreeMapper.
+>
+> **Why.** The one-shot flow asked the user to operate two devices at every
+> tree. Streaming removes the watch from the loop: the phone always holds a
+> position that is at most one interval old, so recording a tree is a phone
+> action again, as it was before any of this existed.
+>
+> What this changes against the text below:
+>
+> - Section 4: the watch no longer reads a position "on button press", and it
+>   does **not** "reject any fix below QUALITY_USABLE". It filters nothing. The
+>   quality setting on the watch only colours its own screen.
+> - Section 5's protocol is superseded entirely. `start`, `stop`, `flush` and
+>   `fix` are gone; `rate` is new. `err` is gone. `pt` lost `r` and `o` and
+>   gained `sid`. See `PROTOCOL.md`.
+> - Section 6's `capture()` sketch, its quality floor and its vibration calls
+>   do not reflect the code. There are no haptics at all.
+> - Section 6's screen mock is superseded by the stream screen.
+> - Section 10's error table assumes buffering and a quality floor; neither
+>   exists. A point that cannot be sent is dropped and counted.
+> - Section 12's unit test list should read: sequence numbering, interval
+>   clamping, drop accounting, and the serialisation of coordinates.
+>
+> **Two things this gives up.** There is no per-point delivery guarantee any
+> more: a stream cannot wait for an acknowledgement, because a retry would put
+> a stale coordinate on the wire. What replaces it is liveness, shown on both
+> screens. And the battery cost is higher and currently **unmeasured**, which
+> is the single most important open item in this document. The watch accepts a
+> `rate` command specifically so the interval can be widened after measurement
+> without shipping a new build.
+>
+> **One thing it makes possible, not yet built.** A continuous position stream
+> means the phone can average many fixes taken while somebody stands still at a
+> tree. That beats any single fix, and it is a stronger accuracy argument than
+> section 1 makes. The agreed v1 behaviour is simpler: the phone shows the live
+> position and its quality, and the user decides whether to record it.
+>
+> The working contract is **`PROTOCOL.md`**, which is current. Where this
+> document and PROTOCOL.md disagree, PROTOCOL.md wins. Where the two amendments
+> disagree, the later one wins.
+
+---
+
 ## 1. Problem
 
 TreeMapper (Android and iOS) geotags trees, records measurements, and uploads to the ForestCloud server. On some Android devices the GPS fix is not accurate enough for the plots we map, especially under canopy where multipath and signal blockage are worst.

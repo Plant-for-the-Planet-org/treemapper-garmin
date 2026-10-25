@@ -85,7 +85,6 @@ class WatchLink(
     private fun outboundApp(): IQApp =
         if (connectType == ConnectIQ.IQConnectType.TETHERED) simulatorApp else watchApp
     private var listeningForApp = false
-    private var requestCounter = 0
 
     // ---- lifecycle -------------------------------------------------------
 
@@ -411,11 +410,8 @@ class WatchLink(
     fun sendPing() = send(Protocol.ping(), "ping")
 
     /** Ask for one point. Returns the request id so the UI can match the reply. */
-    fun requestFix(): Int {
-        requestCounter += 1
-        send(Protocol.requestFix(requestCounter), "fix r=$requestCounter")
-        return requestCounter
-    }
+    fun setRate(intervalMs: Int) =
+        send(Protocol.setRate(intervalMs), "rate ms=$intervalMs")
 
     private fun send(message: List<Any>, label: String) {
         val iq = connectIQ

@@ -6,9 +6,10 @@ import Toybox.WatchUi;
 //! Enhanced Readability behaviour for free, and they are what a Garmin user
 //! already knows how to operate.
 //!
-//! There is no "end session" item because there is no session to end. The
-//! watch holds nothing between trees, so leaving the app is just BACK from the
-//! acquiring screen.
+//! Pause is not in here. It is the primary action on the stream screen, on
+//! the physical button, because it is the one thing somebody might need to do
+//! with cold hands without reading anything. Ending the session is BACK from
+//! that same screen, which asks before it does it.
 module SessionMenu {
     function build() as WatchUi.Menu2 {
         var session = $.gSession;

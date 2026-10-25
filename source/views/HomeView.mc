@@ -11,8 +11,8 @@ import Toybox.WatchUi;
 //! nothing to confirm. It holds for a beat to say which app just opened, then
 //! moves to acquisition on its own. START skips it.
 //!
-//! That matters for the phone flow: when TreeMapper calls openApplication(),
-//! this app must get to a useful state without anyone touching the watch.
+//! That matters for the field flow: the watch is opened, glanced at and set
+//! down, so it has to reach the streaming screen without anyone touching it.
 class HomeView extends WatchUi.View {
 
     const AUTO_ADVANCE_MS = 1500;
@@ -55,13 +55,6 @@ class HomeView extends WatchUi.View {
         var session = $.gSession;
         if (session != null) {
             session.tick();
-
-            // If the phone asks for a point during the splash, skip straight
-            // through so the request is served and shown.
-            if (session.isRemoteActive()) {
-                advance();
-                return;
-            }
         }
 
         if ((System.getTimer() - _shownAtMs) >= AUTO_ADVANCE_MS) {

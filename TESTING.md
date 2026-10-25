@@ -59,14 +59,24 @@ About thirty minutes, indoors except for the last two steps.
 |---|---|---|---|
 | 1 | **Find watch** | device name, `CONNECTED` | Watch asleep, or not paired in Garmin Connect |
 | 2 | (automatic) | app line shows `installed vN` | The sideload did not take, or the app id does not match `manifest.xml` |
-| 3 | **Hello** | `ready` arrives; watch line shows quality and **multi-band** | Nothing arrives: the watch app is not running. Open it on the wrist and retry |
+| 3 | **Hello** | `ready` arrives; watch line shows quality, **multi-band**, `live`, `every 1.0 s` | Nothing arrives: the watch app is not running. Open it on the wrist and retry |
 | 4 | **Open watch app** | app launches on the wrist | See the note below, this is a real open question |
-| 5 | **Request GPS point** | a point, round trip under ~1 s | Watch outdoors yet? Indoors there may be no fix at all |
-| 6 | Press START **on the watch** | point arrives unprompted, `from watch`; watch returns to acquiring | |
-| 7 | Press START again | the flow runs from the top and a second point arrives | Watch should not be counting trees; there is no tally on screen |
-| 8 | Walk 30 m away, press START | watch says **NOT SENT, phone not in range**, and stays there | Nothing is buffered: this is expected, not a bug |
-| 9 | Walk back, press START | the **same** fix goes through and the watch says SENT | The coordinate must match the one taken at step 8, not a fresh one |
-| 10 | Press START, then BACK at **NOT SENT** | the fix is discarded and the watch returns to acquiring | |
+| 5 | (do nothing) | points start arriving on their own, about one a second, `gap` near 1000 ms | Nothing arrives: the watch sends nothing until it has heard `hello`. Outdoors yet? Indoors there may be no fix at all |
+| 6 | Watch the wrist | `LIVE 1.0 s`, the sent count climbing, status reads **Sending to TreeMapper** | |
+| 7 | Let it run 5 minutes | `n` on the phone matches the watch count; `drop` stays at or near 0 | A climbing `drop` means 1 Hz is too fast for this link. Record the number, then try step 10 |
+| 8 | Press START **on the watch** | watch says **PAUSED**, points stop, `ready` arrives with `st=paused` | |
+| 9 | Press START again | points resume within about a second, with no reacquisition wait | A wait here means the receiver was switched off, which pause must not do |
+| 10 | **Ask for 2.0 s interval** | `ready` confirms `every 2.0 s`, the watch header reads `LIVE 2.0 s`, `gap` doubles | |
+| 11 | Walk 30 m away | watch says **No phone in range**, points stop, `drop` does **not** climb | Nothing is buffered, and out-of-range time is deliberately not counted as dropped |
+| 12 | Walk back | points resume on their own | |
+| 13 | Press BACK on the watch | **End session?** confirmation appears, and only then does the app exit | It must not exit on the first press |
+
+### The three numbers to write down
+
+`drop` after an hour at 1 Hz, the typical `gap` between arrivals, and the
+battery figure from section 2. Together they decide whether the default
+interval stays at one second. The watch takes a `rate` command precisely so
+that answer can change without shipping a new build.
 
 ### Two things to record while you are there
 
@@ -74,6 +84,11 @@ About thirty minutes, indoors except for the last two steps.
 documentation does not say, and the answer decides whether the TreeMapper modal
 needs a "check your watch" state. This is the single most important unknown
 left in the design.
+
+**Does the stream hold at 1 Hz?** The point card prints a `gap` line: the
+measured milliseconds between arrivals. If it sits near the interval the watch
+reports, the link is keeping up. If it drifts well above, it is not, and the
+watch's own `drop` count should agree.
 
 **What type do the coordinates arrive as?** The point card prints a `type` line.
 Right now the watch sends them as text (`SAFE_COORDS = true` in
@@ -124,9 +139,20 @@ to converge, before spending on hardware.
 - **Time to first fix**, cold, under canopy. This is what the person waits for.
   A brand new watch downloads satellite data on its first outdoor use and can
   take several minutes; that is one-off, do not measure it as typical.
-- **Battery over a full session**, receiver running continuously. The design
-  assumes roughly a working day. Confirm it and publish the real number to field
-  teams rather than a specification sheet figure.
+- **Battery over a full session**, receiver running continuously **and the
+  stream transmitting**. This is now the most important unknown in the project.
+  The old one-shot design was measured against GNSS alone; posting a point every
+  second wakes the radio 3,600 times an hour on top of that, and on Android
+  every one of those is relayed through Garmin Connect. Measure it at 1 Hz and
+  again at 5 s, so there is a real trade to offer field teams rather than a
+  guess. Publish the number instead of a specification sheet figure.
+- **Whether a dark screen stops anything.** Leave the watch untouched until the
+  display sleeps, then check the phone is still receiving. The stream runs off
+  its own timer in `SessionState` rather than the view's, specifically so this
+  works, but it has never been confirmed on hardware.
+- **Two concurrent timers.** The stream timer and the view's render timer run
+  at the same time. Most products allow several; confirm yours does not quietly
+  drop one.
 - **Quality distribution**: how often the fix is `GOOD` versus `USABLE` under
   your canopy. If it sits at `USABLE` all day, the warn-below setting should
   default accordingly.
@@ -137,7 +163,8 @@ to converge, before spending on hardware.
 
 For reference, so nobody re-litigates this:
 
-- Real Bluetooth timing and dropouts. The ADB transport is a TCP socket.
+- Real Bluetooth timing and dropouts. The ADB transport is a TCP socket, so a
+  `drop` count of zero there proves nothing about 1 Hz over real Bluetooth.
 - Real GNSS. Simulated position comes from a menu.
 - Whether `openApplication()` prompts on the wrist.
 - The Garmin Connect dependency, which TETHERED bypasses entirely.

@@ -36,8 +36,12 @@ class MainActivity : AppCompatActivity(), WatchLink.Listener {
 
     private val stamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.UK)
     private val logLines = StringBuilder()
-    private var pendingRequestId: Int? = null
-    private var requestSentAt = 0L
+    /** Interval the rate button will ask for next. Toggles 1 s / 2 s. */
+    private var nextIntervalMs = 2000
+
+    /** Arrival time of the previous point, for the measured gap. */
+    private var lastPointAt = 0L
+    private var pointsSeen = 0
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -82,9 +86,10 @@ class MainActivity : AppCompatActivity(), WatchLink.Listener {
         ui.buttonHello.setOnClickListener { link.sendHello() }
         ui.buttonPing.setOnClickListener { link.sendPing() }
         ui.buttonFix.setOnClickListener {
-            pendingRequestId = link.requestFix()
-            requestSentAt = System.currentTimeMillis()
-            ui.textPoint.text = getString(R.string.waiting_for_point)
+            link.setRate(nextIntervalMs)
+            nextIntervalMs = if (nextIntervalMs == 1000) 2000 else 1000
+            ui.buttonFix.text = getString(R.string.action_rate_fmt,
+                nextIntervalMs / 1000.0)
         }
         ui.buttonStore.setOnClickListener { link.openStoreListing() }
         ui.buttonCopy.setOnClickListener { copyLog() }
@@ -153,7 +158,10 @@ class MainActivity : AppCompatActivity(), WatchLink.Listener {
                     parsed.quality,
                     if (parsed.gpsRunning) "on" else "off",
                     if (parsed.multiBand) "multi-band" else "single-band",
-                    parsed.buffered
+                    parsed.state,
+                    parsed.intervalMs / 1000.0,
+                    parsed.seq,
+                    parsed.dropped
                 )
                 if (parsed.version != Protocol.VERSION) {
                     log("PROTOCOL MISMATCH: watch v${parsed.version}, " +
@@ -163,22 +171,19 @@ class MainActivity : AppCompatActivity(), WatchLink.Listener {
 
             is Protocol.Inbound.Point -> showPoint(parsed)
 
-            is Protocol.Inbound.Error ->
-                log("watch error: ${parsed.code} (r=${parsed.requestId})")
-
             is Protocol.Inbound.Unknown ->
                 log("unknown message type: ${parsed.raw}")
         }
     }
 
     private fun showPoint(p: Protocol.Inbound.Point) {
-        val roundTrip = if (p.requestId != null && p.requestId == pendingRequestId) {
-            val ms = System.currentTimeMillis() - requestSentAt
-            pendingRequestId = null
-            "${ms} ms"
-        } else {
-            "unsolicited"
-        }
+        // The measured gap between arrivals is the number that matters now.
+        // If it drifts well above the interval the watch reports, the link is
+        // not keeping up and the watch's own `drop` count will say the same.
+        val now = System.currentTimeMillis()
+        val gap = if (lastPointAt == 0L) "first" else "${now - lastPointAt} ms"
+        lastPointAt = now
+        pointsSeen += 1
 
         // Seven decimal places is about 1 cm. If the latitude arrived as a
         // Float the trailing digits will be visibly wrong, which is the whole
@@ -192,8 +197,9 @@ class MainActivity : AppCompatActivity(), WatchLink.Listener {
             append("qual ").append(Protocol.qualityLabel(p.quality))
                 .append(" (").append(p.quality).append(")\n")
             append("time ").append(stamp.format(Date(p.timestamp * 1000L))).append('\n')
-            append("seq  #").append(p.seq).append("  from ").append(p.source).append('\n')
-            append("trip ").append(roundTrip).append('\n')
+            append("seq  #").append(p.seq).append("  sid ").append(p.sessionId).append('\n')
+            append("gap  ").append(gap).append("  (").append(pointsSeen)
+                .append(" seen)\n")
             append("type ").append(p.latitudeType)
         }
         ui.textPoint.text = text

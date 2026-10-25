@@ -284,9 +284,12 @@ Then, in order:
 |---|---|
 | **Find watch** | The SDK is up, Garmin Connect is reachable, and a device is paired. Reports connected vs known so "paired but asleep" is distinguishable from "no watch". |
 | **Open watch app** | `openApplication()` works. Watch the wrist: this is the open question in `DESIGN.md`, whether it launches silently or prompts. |
-| **Hello** | Two-way messaging. The watch answers with a `ready` message carrying live fix quality. |
+| **Hello** | Two-way messaging, and **this is what starts the stream**. The watch sends nothing until it has heard from the phone, so press this first. The watch answers with a `ready` carrying live fix quality, the state (`live` or `paused`), the interval, and the dropped count. |
 | **Ping** | Same, as a keepalive. Useful for watching quality climb while the receiver converges. |
-| **Request GPS point** | The whole thing. Round trip time is shown. |
+| **Ask for N s interval** | Sends a `rate` command and toggles between 1 s and 2 s. The watch clamps to 500 to 60000 ms and confirms what it actually adopted. |
+
+There is no "request a point" button any more. Points arrive on their own,
+about one a second, for as long as the watch app is open and not paused.
 
 The log pane records every message in both directions verbatim, and is
 selectable so you can paste it into a bug report.
@@ -335,9 +338,15 @@ the artifact without it. Check Maven Central for a version newer than 2.4.0.
 ## What this is not
 
 No server calls, no storage, no permissions beyond Bluetooth, no retry logic. It
-is a wire test. The retry, dedupe and offline behaviour described in
-`PROTOCOL.md` belong in TreeMapper proper, not here.
+is a wire test. The dedupe and display behaviour described in `PROTOCOL.md`
+belongs in TreeMapper proper, not here.
 
-One thing it does not exercise: **duplicate handling**. The watch holds a point
-until the transport acknowledges it, so if an ack is lost after you have already
-stored the point you will see it twice. Deduplicate on `n` in the real app.
+**The number to watch is `gap`**, printed on the point card: the measured
+milliseconds between arrivals. Compare it with the interval the watch reports
+in its `ready` line. If `gap` sits near the interval, the link is keeping up;
+if it drifts well above, it is not, and the watch's own `drop` count should say
+the same. That comparison is the main thing this harness is for now.
+
+Two things it does not exercise: **duplicate handling**, which is unlikely now
+that nothing is retried but still worth doing on `(sid, n)`, and **anything
+about battery**, which only a real watch outdoors can tell you.
