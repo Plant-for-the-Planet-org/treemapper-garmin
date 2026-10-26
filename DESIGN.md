@@ -214,7 +214,7 @@ Every point carries `s` (session id, assigned by the phone) and `n` (monotonic s
     type="watch-app"
     name="@Strings.AppName"
     launcherIcon="@Drawables.LauncherIcon"
-    minApiLevel="3.3.6">
+    minApiLevel="3.0.8">
 
   <iq:products>
     <!-- exactly the purchased models, nothing else -->
@@ -229,22 +229,37 @@ Every point carries `s` (session id, assigned by the phone) and `n` (monotonic s
 
 Notes:
 - Type must be `watch-app`. Only widgets and device apps may call `Position.enableLocationEvents()`. A watch face or data field cannot do this.
-- `minApiLevel` 3.3.6 because the multi-band GNSS configuration constants arrived there.
+- `minApiLevel` 3.0.8, set by GPSMAP 66 and 86. It was 3.3.6, where the multi-band GNSS configuration constants arrived, which locked those two out. Handhelds are the priority, so the floor follows them and the constants are treated as optional instead. See below.
 - Two permissions only. Every extra permission is shown to the user before install and costs conversion.
 - No `Background` permission in v1. Everything happens in the foreground.
 
 ### GNSS configuration
 
-Request the best supported mode, and always gate with `hasConfigurationSupport()` so one binary runs on every purchased model:
+Request the best supported mode, and gate every step, so one binary runs on every purchased model.
+
+Two levels of gate are needed, not one. `hasConfigurationSupport()` answers whether a *given* configuration works on this device. It does not answer whether the configuration API exists at all, and on GPSMAP 66 and 86 it does not: those devices cap at Connect IQ 3.0.8 and their firmware declares none of the `CONFIGURATION_` constants, not even `CONFIGURATION_GPS`. Naming one there is a Symbol Not Found at runtime. The compiler builds it happily, so this is only caught on the device.
+
+So nothing is named until `Position has` confirms it, and the whole thing may legitimately answer null:
 
 ```monkeyc
-function bestConfig() as Position.ConfigurationType {
-    var preferred = [
-        Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1_L5,  // multi-band, best accuracy
-        Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1,
-        Position.CONFIGURATION_GPS_GALILEO,
-        Position.CONFIGURATION_GPS
-    ];
+function bestConfig() as Position.Configuration or Null {
+    if (!(Position has :hasConfigurationSupport) ||
+        !(Position has :CONFIGURATION_GPS)) {
+        return null;              // GPSMAP 66 / 86: no configuration API at all
+    }
+
+    var preferred = [] as Array<Position.Configuration>;
+    if (Position has :CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1_L5) {
+        preferred.add(Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1_L5);
+    }                             // multi-band, best accuracy
+    if (Position has :CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1) {
+        preferred.add(Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1);
+    }
+    if (Position has :CONFIGURATION_GPS_GALILEO) {
+        preferred.add(Position.CONFIGURATION_GPS_GALILEO);
+    }
+    preferred.add(Position.CONFIGURATION_GPS);
+
     for (var i = 0; i < preferred.size(); i++) {
         if (Position.hasConfigurationSupport(preferred[i])) {
             return preferred[i];
@@ -254,12 +269,16 @@ function bestConfig() as Position.ConfigurationType {
 }
 
 function startGps() as Void {
-    Position.enableLocationEvents({
-        :acquisitionType => Position.LOCATION_CONTINUOUS,
-        :configuration   => bestConfig()
-    }, method(:onPosition));
+    var options = { :acquisitionType => Position.LOCATION_CONTINUOUS };
+    var config = bestConfig();
+    if (config != null) {
+        options[:configuration] = config;   // key omitted on GPSMAP 66 / 86
+    }
+    Position.enableLocationEvents(options, method(:onPosition));
 }
 ```
+
+A null is not a failure. The device runs its own default constellation, which is the best it can do, and `isMultiBand()` reports false because there is no way to ask or to check. The `mb` field in `ready` therefore says single-band on those two products regardless of what the hardware can actually do. That is a reporting limit, not a measurement.
 
 Do **not** use `CONFIGURATION_SAT_IQ`. It trades accuracy for battery by picking the solution dynamically, which is the opposite of what we want.
 

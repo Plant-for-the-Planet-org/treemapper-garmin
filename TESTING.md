@@ -9,11 +9,24 @@ accuracy gain is not there, the link working is irrelevant.
 
 ## 0. What to buy
 
-One watch is enough to start. Two lets you compare.
+**Handhelds first.** They are the priority for this app; watches are secondary.
+Four handhelds are supported, and `README.md` has the full table with the two
+rules that decide it: the firmware must carry `registerForPhoneAppMessages`, and
+GPSMAP 65/65s can never work because it is not a Connect IQ device at all.
 
-The requirement is **multi-band GNSS (GPS L1 + L5)**. Single-band Garmin watches
-will not reliably beat a good phone under canopy, so buying one would prove
-nothing. At the time of writing that means roughly:
+Of the four, **GPSMAP H1 / H1i Plus and eTrex Touch are the ones to buy.** They
+run Connect IQ 5.x, which means the app can request multi-band and report what
+it got. GPSMAP 66 and 86 run the app but expose no configuration API, so they
+use the device default constellation and always report single-band. They are
+worth testing if you already own one, and are not worth buying to prove a point
+about accuracy, because the app cannot tell you what they are doing.
+
+If you are testing watches as well, one is enough to start and two let you
+compare.
+
+The requirement for a watch is **multi-band GNSS (GPS L1 + L5)**. Single-band
+Garmin watches will not reliably beat a good phone under canopy, so buying one
+would prove nothing. At the time of writing that means roughly:
 
 fēnix 7 Pro / 7X Pro, fēnix 8, epix Pro (Gen 2), Forerunner 955, Forerunner 965,
 Enduro 3, Instinct 2X Solar, quatix 7 Pro, tactix 7.

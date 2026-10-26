@@ -210,10 +210,50 @@ the number keeps meaning one thing: this interval is too fast for this link.
 
 ---
 
+## Supported devices
+
+**Handhelds are the priority.** Watches are secondary.
+
+The gate is not the marketing page, it is whether the firmware carries
+`Communications.transmit` and `registerForPhoneAppMessages`. Check it in the SDK
+device database at
+`~/Library/Application Support/Garmin/ConnectIQ/Devices/<id>/<id>.api.debug.xml`
+before adding anything.
+
+| Handheld | Product id | Connect IQ | Multi-band reporting |
+|---|---|---|---|
+| GPSMAP H1 / H1i Plus | `gpsmaph1` | 5.0.0 | yes |
+| eTrex Touch | `etrextouch` | 5.1.1 | yes |
+| GPSMAP 86s / 86sc / 86i / 86sci | `gpsmap86` | 3.0.8 | no, see below |
+| GPSMAP 66s / 66i / 66sr / 66st | `gpsmap66` | 3.0.8 | no, see below |
+
+On the two 3.0.8 products the Position configuration API does not exist at all,
+not even `CONFIGURATION_GPS`. The app cannot request a constellation and cannot
+ask which one is in use, so it runs on the device default and reports
+single-band in `ready`. That is a limit of what the firmware exposes, not a
+measurement of the hardware.
+
+### Will not work, and cannot be made to
+
+| Device | Why |
+|---|---|
+| GPSMAP 67 / 67i | No phone app messaging in firmware |
+| Montana 7 | No phone app messaging in firmware |
+| Oregon 7xx | No phone app messaging in firmware |
+| Rino 7xx | No phone app messaging in firmware |
+| **GPSMAP 65 / 65s** | **Not a Connect IQ device at all.** No entry in the SDK device database, runs no Connect IQ apps of any kind. Garmin Connect shows it as incompatible. Nothing in this repo can reach it. |
+
+The first four compile without complaint and fail at runtime, which is why they
+are listed here rather than left to be rediscovered.
+
+---
+
 ## Open questions
 
-- **Which devices?** The product list is a guess. This drives the test matrix and
-  should be settled before any device specific tuning.
+- **How much accuracy do the 3.0.8 handhelds actually give?** GPSMAP 66 and 86
+  run on their own constellation choice because they have no configuration API,
+  and the app cannot report what they picked. Only a field test answers whether
+  they are worth deploying. See the device table above.
 - **Brand green.** `Theme.GREEN` is `#007A49`. `Theme.GREEN_LIGHT` is a lifted
   variant used only for small text; see the design notes above.
 - **Does 1 Hz hold, and what does it cost?** Both have to be measured on real

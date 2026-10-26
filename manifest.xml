@@ -15,9 +15,13 @@
   is open. No Fit permission: the app does not record activities, and holding
   Fit would move it into the device's Activities list instead of the app list.
 
-  minApiLevel 3.3.6 is set by the multi band GNSS configuration constants
-  (CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1_L5 and hasConfigurationSupport),
-  which are the whole reason for using a watch over a phone.
+  minApiLevel 3.0.8 is set by GPSMAP 66 and 86, the oldest handhelds that can
+  run this app at all. It used to be 3.3.6, the floor for the multi band GNSS
+  configuration constants, which excluded them. GpsService now treats those
+  constants as optional rather than assumed: it names none of them until
+  `Position has` confirms them and omits the :configuration key entirely when
+  they are absent, so one binary covers both generations. Handhelds are the
+  priority for this app, so the floor follows them.
 
   Set the real product list with "Monkey C: Edit Products" so the ids are
   validated against your SDK.
@@ -29,7 +33,7 @@
         name="@Strings.AppName"
         entry="TreeMapperApp"
         launcherIcon="@Drawables.LauncherIcon"
-        minApiLevel="3.3.6">
+        minApiLevel="3.0.8">
 
         <iq:products>
             <!-- Watches. Round or square, roughly 1:1, 208 to 454 px. -->
@@ -45,23 +49,41 @@
             <iq:product id="instinct2x"/>
 
             <!--
-              Handhelds. Tall rectangles, 1:1.67, with a keypad and a
-              touchscreen. These two are the only handhelds that qualify:
-              they run Connect IQ 5.x, they carry the multi band GNSS
-              configuration API, and their firmware has
-              Communications.transmit and registerForPhoneAppMessages.
+              Handhelds, the priority for this app. Every Connect IQ handheld
+              whose firmware carries Communications.transmit and
+              registerForPhoneAppMessages is here. That is the real gate, and
+              the SDK device database is where to check it: a device whose
+              api.debug.xml has no registerForPhoneAppMessages cannot talk to
+              the phone, whatever the marketing page says.
+
+              Two generations, and they differ in one way that matters:
+
+                gpsmaph1, etrextouch   Connect IQ 5.x. Full Position
+                                       configuration API, so the app can ask
+                                       for multi band (L1 + L5) and report it.
+
+                gpsmap86, gpsmap66     Connect IQ 3.0.8. No Position
+                                       configuration API at all, not even
+                                       CONFIGURATION_GPS. The app runs on the
+                                       device's own constellation choice and
+                                       reports single band, because there is
+                                       no way to ask or to check. See
+                                       GpsService.bestConfiguration.
 
               GPSMAP 67/67i, Montana 7, Oregon 7xx and Rino 7xx are NOT
               here. Their firmware has no phone app messaging at all, so
               PhoneLink cannot work on them. The compiler does not catch
               this, it fails at runtime, so do not add them back.
 
-              GPSMAP 66 and 86 do carry messaging but cap at API 3.1.9 and
-              3.0.8, below the 3.3.6 floor the multi band configuration
-              needs.
+              GPSMAP 65/65s is not a Connect IQ device at all. It has no
+              entry in the SDK device database, runs no Connect IQ apps of
+              any kind, and Garmin Connect reports it as incompatible. No
+              manifest change can reach it.
             -->
             <iq:product id="gpsmaph1"/>
             <iq:product id="etrextouch"/>
+            <iq:product id="gpsmap86"/>
+            <iq:product id="gpsmap66"/>
         </iq:products>
 
         <iq:permissions>

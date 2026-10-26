@@ -35,30 +35,49 @@ class GpsService {
     function initialize() {
     }
 
-    //! The best GNSS configuration this device actually supports.
+    //! The best GNSS configuration this device actually supports, or null when
+    //! the device has no configuration API at all.
     //!
     //! Multi band (L1 + L5) is the accuracy win under canopy and the reason
     //! this project exists, so it is asked for first. Every option is gated by
     //! hasConfigurationSupport, because one binary runs on several products and
     //! asking for an unsupported configuration is a runtime error.
     //!
+    //! Null is a real answer, not a failure. GPSMAP 66 and 86 cap at Connect
+    //! IQ 3.0.8 and carry none of the CONFIGURATION_ constants, not even
+    //! CONFIGURATION_GPS. Naming one there is a Symbol Not Found at runtime
+    //! that the compiler does not catch, so nothing below is referenced until
+    //! `has` says it exists, and start() leaves the key out of the options
+    //! rather than passing a fallback. Those devices run their own default
+    //! constellation, which is the best they can do.
+    //!
     //! SAT_IQ is deliberately not in the list. It trades accuracy for battery
     //! by picking the solution dynamically, which is the opposite of what a
     //! survey tool wants.
-    private function bestConfiguration() as Position.Configuration {
-        // Every enum literal is cast: a literal types as Enum<Configuration>
-        // rather than Configuration, which the checker rejects.
-        var fallback = Position.CONFIGURATION_GPS as Position.Configuration;
-        if (!(Position has :hasConfigurationSupport)) {
-            return fallback;
+    private function bestConfiguration() as Position.Configuration or Null {
+        if (!(Position has :hasConfigurationSupport) ||
+            !(Position has :CONFIGURATION_GPS)) {
+            return null;
         }
 
-        var preferred = [
-            Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1_L5 as Position.Configuration,
-            Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1 as Position.Configuration,
-            Position.CONFIGURATION_GPS_GALILEO as Position.Configuration,
-            fallback
-        ] as Array<Position.Configuration>;
+        // Every enum literal is cast: a literal types as Enum<Configuration>
+        // rather than Configuration, which the checker rejects. Each is added
+        // only if this device declares it, so the list is per product.
+        var fallback = Position.CONFIGURATION_GPS as Position.Configuration;
+        var preferred = [] as Array<Position.Configuration>;
+
+        if (Position has :CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1_L5) {
+            preferred.add(
+                Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1_L5 as Position.Configuration);
+        }
+        if (Position has :CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1) {
+            preferred.add(
+                Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1 as Position.Configuration);
+        }
+        if (Position has :CONFIGURATION_GPS_GALILEO) {
+            preferred.add(Position.CONFIGURATION_GPS_GALILEO as Position.Configuration);
+        }
+        preferred.add(fallback);
 
         for (var i = 0; i < preferred.size(); i++) {
             if (Position.hasConfigurationSupport(preferred[i])) {
@@ -84,10 +103,19 @@ class GpsService {
 
         // The casts are required: an enum literal types as Enum<T> rather than
         // T, and the options dictionary is declared with the exact types.
-        Position.enableLocationEvents({
-            :acquisitionType => Position.LOCATION_CONTINUOUS as Position.LocationAcquisitionType,
-            :configuration   => _configuration as Position.Configuration
-        }, method(:onPosition));
+        //
+        // :configuration is added only when the device has the configuration
+        // API. On GPSMAP 66 and 86 there is no constant to pass, so the key is
+        // left out and the device picks its own constellation.
+        var options = {
+            :acquisitionType => Position.LOCATION_CONTINUOUS as Position.LocationAcquisitionType
+        };
+        var configuration = _configuration;
+        if (configuration != null) {
+            options[:configuration] = configuration;
+        }
+
+        Position.enableLocationEvents(options, method(:onPosition));
 
         _enabled = true;
     }
