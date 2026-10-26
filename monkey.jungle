@@ -6,3 +6,28 @@ base.resourcePath = resources
 # Type checking: gradual. Raise to 2 (informative) once the real
 # background/glance code exists and needs scope validation.
 project.typecheck = 1
+
+# ---------------------------------------------------------------------------
+# Per product launcher icons for the handhelds.
+#
+# GPSMAP 66, GPSMAP 86 and eTrex Touch ask for a 38x33 launcher slot, which is
+# not square, so the compiler scaling the 128x128 base icon into it squashes
+# the glyph. GPSMAP H1 wants 32x32. Each of these gets an exact size icon from
+# tools/make_icons.py, which writes the folders named below.
+#
+# Watches are not listed on purpose: their slots are square and the downscale
+# from 128 is clean, so they keep the base icon and only warn.
+#
+# Without a line here the resources-<product> folder is silently ignored and
+# the build falls back to the base icon, warning and all.
+#
+# Each of these builds prints "already exists in the resource path ... will be
+# overriden with higher precedence". That warning IS the override working: the
+# device folder shadows resources/drawables/drawables.xml by design. Keep the
+# file name the same on both sides, because precedence is what resolves the
+# duplicate Drawables.LauncherIcon id.
+# ---------------------------------------------------------------------------
+gpsmaph1.resourcePath = $(gpsmaph1.resourcePath);resources-gpsmaph1
+etrextouch.resourcePath = $(etrextouch.resourcePath);resources-etrextouch
+gpsmap86.resourcePath = $(gpsmap86.resourcePath);resources-gpsmap86
+gpsmap66.resourcePath = $(gpsmap66.resourcePath);resources-gpsmap66

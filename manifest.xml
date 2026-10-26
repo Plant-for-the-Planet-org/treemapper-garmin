@@ -25,6 +25,13 @@
 
   Set the real product list with "Monkey C: Edit Products" so the ids are
   validated against your SDK.
+
+  version is the string the Connect IQ Store shows for this build. It must be
+  three dot separated numbers. 2.0.0 is the streaming release: version 1 was
+  the published one shot capture app, and protocol v2 replaced request and
+  response with a 1 Hz stream, which is a breaking change for any phone client.
+  The store also keeps its own internal version for update detection, so this
+  number is for people, not for the updater. Bump it on every store upload.
 -->
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
     <iq:application
@@ -33,6 +40,7 @@
         name="@Strings.AppName"
         entry="TreeMapperApp"
         launcherIcon="@Drawables.LauncherIcon"
+        version="2.0.0"
         minApiLevel="3.0.8">
 
         <iq:products>
