@@ -95,6 +95,42 @@ class GpsService {
         return _configuration == Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1_L5;
     }
 
+    //! Whether this device accepts the Dictionary form of
+    //! enableLocationEvents.
+    //!
+    //! Garmin added the options Dictionary in Connect IQ 3.2.0. Before that
+    //! the call takes a bare LOCATION_* value and nothing else. GPSMAP 86 is
+    //! 3.0.8 across every part number and GPSMAP 66 ships units at 3.0.8 too,
+    //! so handing those the Dictionary everything else uses means the receiver
+    //! is asked to start in a form the firmware cannot read.
+    //!
+    //! There is nothing to feature detect with `has`: the symbol exists on
+    //! both generations and only the accepted argument changed, so the
+    //! Connect IQ version is the only signal. Nothing is given up on the old
+    //! devices, because bestConfiguration() already returns null there and the
+    //! Dictionary would have carried :acquisitionType alone.
+    private function hasOptionsDictionary() as Boolean {
+        var settings = System.getDeviceSettings();
+        if (!(settings has :monkeyVersion)) {
+            return false;
+        }
+
+        var version = settings.monkeyVersion;
+        if (version == null or version.size() < 2) {
+            return false;
+        }
+
+        var major = version[0];
+        var minor = version[1];
+        if (major == null or minor == null) {
+            return false;
+        }
+        if (major != 3) {
+            return major > 3;
+        }
+        return minor >= 2;
+    }
+
     function start() as Void {
         if (_enabled) { return; }
 
@@ -103,12 +139,21 @@ class GpsService {
 
         // The casts are required: an enum literal types as Enum<T> rather than
         // T, and the options dictionary is declared with the exact types.
-        //
+        var continuous = Position.LOCATION_CONTINUOUS as Position.LocationAcquisitionType;
+
+        if (!hasOptionsDictionary()) {
+            // Connect IQ 3.0.8 and 3.1.x: the bare form is the only one this
+            // firmware understands. See hasOptionsDictionary.
+            Position.enableLocationEvents(continuous, method(:onPosition));
+            _enabled = true;
+            return;
+        }
+
         // :configuration is added only when the device has the configuration
         // API. On GPSMAP 66 and 86 there is no constant to pass, so the key is
         // left out and the device picks its own constellation.
         var options = {
-            :acquisitionType => Position.LOCATION_CONTINUOUS as Position.LocationAcquisitionType
+            :acquisitionType => continuous
         };
         var configuration = _configuration;
         if (configuration != null) {
@@ -125,9 +170,16 @@ class GpsService {
     function stop() as Void {
         if (!_enabled) { return; }
 
-        Position.enableLocationEvents(
-            { :acquisitionType => Position.LOCATION_DISABLE as Position.LocationAcquisitionType },
-            method(:onPosition));
+        // Same version split as start(). Getting this wrong is worse here:
+        // a stop the firmware cannot read leaves the receiver running and
+        // turns a working day of battery into an afternoon.
+        var disable = Position.LOCATION_DISABLE as Position.LocationAcquisitionType;
+        if (hasOptionsDictionary()) {
+            Position.enableLocationEvents(
+                { :acquisitionType => disable }, method(:onPosition));
+        } else {
+            Position.enableLocationEvents(disable, method(:onPosition));
+        }
 
         _enabled = false;
         _info = null;
